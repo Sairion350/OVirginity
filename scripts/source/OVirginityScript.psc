@@ -87,6 +87,7 @@ EndFunction
 Event OstimStart(string eventName, string strArg, float numArg, Form sender)
 	If (!ostim.GetSubActor()) ;I don't think masturbating counts as losing your virginity, Steve
 		console("OVirginity leaving thread early, scene only contains one actor")
+		return
 	EndIf
 	bool domVirgin = isVirgin(ostim.GetDomActor())
 	bool subVirgin = isVirgin(ostim.GetSubActor())
