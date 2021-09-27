@@ -1,15 +1,18 @@
 ScriptName OVirginityScript Extends Quest
+import outils 
 
 ;needs StorageUtils from papyrusutils
 ;int property virginitychance auto
 
-string IsVirginKey
+string IsVirginKey = "IsVirgin"
+string HymenKey = "IsVirgin"
 spell menstruationspell
 sound hymenbreak
 
 faction jobInnServer
 faction FavorJobsBeggarFaction
 faction MarkarthTempleofDibellaFaction
+faction ovProstitute
 
 AssociationType property Spouse Auto
 race property OldPeopleRace auto
@@ -21,25 +24,34 @@ globalvariable virginityChance
 ocumscript ocum
 
 Event OnInit()
-	debug.Notification("OVirginity installed")
-	console("OVirginity installed")
 
 	IsVirginKey = "IsVirgin"
-	ostim = game.GetFormFromFile(0x000801, "Ostim.esp") as OsexIntegrationMain
-	menstruationspell = game.GetFormFromFile(0x000804, "OVirginity.esp") as spell
-	hymenbreak = game.GetFormFromFile(0x000D68, "OVirginity.esp") as sound
+	HymenKey = "HasHymen"
+
+	ostim = outils.getostim()
+
+	menstruationspell = GetFormFromFile(0x000804, "OVirginity.esp") as spell
+	hymenbreak = GetFormFromFile(0x000D68, "OVirginity.esp") as sound
 
 	jobInnServer = game.GetFormFromFile(0x0DEE93, "Skyrim.esm") as faction
 	FavorJobsBeggarFaction = game.GetFormFromFile(0x060028, "Skyrim.esm") as faction
 	MarkarthTempleofDibellaFaction = game.GetFormFromFile(0x0656EA, "Skyrim.esm") as faction
+	ovProstitute = GetFormFromFile(0x0805, "ovirginity.esp") as faction
 
-	virginitychance = game.GetFormFromFile(0x00182D, "OVirginity.esp") as GlobalVariable 
+	virginitychance = game.GetFormFromFile(0x00806, "OVirginity.esp") as GlobalVariable 
 
 	ocum = game.GetFormFromFile(0x000800, "OCum.esp") as ocumscript
 
-	setVirginity(game.getplayer(), true)
+	if GetNPCDataInt(game.GetPlayer(), IsVirginKey) == -1
+		setVirginity(game.getplayer(), true)
+	endif 
+
 	console("Virginity chance: "  + getvirginitychance())
 	OnLoad()
+
+	outils.RegisterForOUpdate(self)
+	debug.Notification("OVirginity installed")
+	console("OVirginity installed")
 EndEvent
 
 int function GetVirginityChance()
@@ -66,6 +78,9 @@ function setVirginity(actor npc, bool virgin, bool fx = false)
 	int virginnum
 	if virgin
 		virginnum = 1
+		if AppearsFemale(npc) ;using appears for speed
+			StoreNPCDataBool(npc, HymenKey, true)
+		endif 
 	else
 		virginnum = 0
 	endif
@@ -73,33 +88,50 @@ function setVirginity(actor npc, bool virgin, bool fx = false)
 	StoreNPCDataInt(npc, IsVirginKey, virginnum)
 
 	if fx && ostim.IsFemale(npc)
-		debug.Notification(npc.GetDisplayName() + " has lost their virginity")
-		ApplyBlood(npc)
-		ostim.PlaySound(npc, hymenbreak)
+		debug.Notification(OSANative.GetDisplayName(npc) + " has lost their virginity")
+		BreakHymen(npc)
 	endif
 
 endfunction
+
+Function BreakHymen(actor npc)
+	if !GetNPCDataBool(npc, HymenKey)
+		Console("Hymen already broken")
+		return 
+	endif 
+	ApplyBlood(npc)
+	ostim.PlaySound(npc, hymenbreak)
+EndFunction
 
 function ApplyBlood(actor act)
 	ocum.CumOnto(act, "VagBlood")
 EndFunction
 
+bool domVirgin
+bool subVirgin
+bool thirdVirgin
+
 Event OstimStart(string eventName, string strArg, float numArg, Form sender)
-	If (!ostim.GetSubActor()) ;I don't think masturbating counts as losing your virginity, Steve
-		console("OVirginity leaving thread early, scene only contains one actor")
-		return
-	EndIf
-	bool domVirgin = isVirgin(ostim.GetDomActor())
-	bool subVirgin = isVirgin(ostim.GetSubActor())
-	bool thirdVirgin = false
-	if ostim.GetThirdActor()
-		thirdVirgin = isVirgin(ostim.GetThirdActor())
+
+
+	actor[] acts = ostim.GetActors()
+
+	domVirgin = isVirgin(acts[0])
+	subvirgin = false
+	if acts.length > 1
+		subvirgin = isVirgin(acts[1])
+	endif
+	thirdVirgin = false
+	if acts.length > 2
+		thirdVirgin = isVirgin(acts[2])
 	endif	
 
-	console(ostim.GetDomActor().GetDisplayName() + " virginity: " + domVirgin)
-	console(ostim.GetSubActor().GetDisplayName() + " virginity: " + subVirgin)
-	if ostim.GetThirdActor()
-		console(ostim.GetThirdActor().GetDisplayName() + " virginity: " + thirdVirgin)
+	console(osanative.getdisplayname(acts[0]) + " virginity: " + domVirgin)
+	if acts.length > 1
+		console(osanative.getdisplayname(acts[1]) + " virginity: " + subVirgin)
+	endif
+	if acts.length > 2
+		console(osanative.getdisplayname(acts[2]) + " virginity: " + thirdVirgin)
 	endif	
 
 	if !domVirgin && !subVirgin && !thirdVirgin
@@ -107,13 +139,30 @@ Event OstimStart(string eventName, string strArg, float numArg, Form sender)
 		return
 	endif	
 
-	while (ostim.AnimationRunning()) && (domVirgin || subVirgin || thirdVirgin)
-		if ostim.GetCurrentAnimationClass() == "Sx"
+	ostim.AddSceneMetadata("hasvirgin")
+
+	RegisterForModEvent("ostim_scenechanged_Sx", "OStimSceneChanged")
+	RegisterForModEvent("ostim_scenechanged_Pf1", "OStimSceneChanged")
+	RegisterForModEvent("ostim_scenechanged_Pf2", "OStimSceneChanged")
+	;console("OV script closing out")
+EndEvent
+
+
+Event OStimSceneChanged(String EventName, String StrArg, Float NumArg, Form Sender)
+	if ostim.HasSceneMetadata("hasvirgin")
+		string cclass = ostim.GetCurrentAnimationClass() 
+		if cclass == "Sx"
 			if domVirgin
-				console("Dom actor virginity lost!")
-				domVirgin = false
-				setVirginity(ostim.GetDomActor(), false, true)
-				SendModEvent("ovirginity_lost_dom")
+				if ostim.IsSoloScene() && ostim.IsFemale(ostim.GetDomActor())
+					console("Dom actor hymen broke!")
+					domVirgin = false
+					BreakHymen(ostim.GetDomActor())
+				else 
+					console("Dom actor virginity lost!")
+					domVirgin = false
+					setVirginity(ostim.GetDomActor(), false, true)
+					SendModEvent("ovirginity_lost_dom")
+				endif 
 			endif
 			if subVirgin
 				console("Sub actor virginity lost!")
@@ -127,21 +176,23 @@ Event OstimStart(string eventName, string strArg, float numArg, Form sender)
 				setVirginity(ostim.GetthirdActor(), false, true)
 				SendModEvent("ovirginity_lost_third")
 			endif
-		elseif (ostim.GetCurrentAnimationClass() == "Pf1") || (ostim.GetCurrentAnimationClass() == "Pf2")
+		elseif (cclass == "Pf1") || (cclass == "Pf2")
+			if domvirgin && ostim.IsSoloScene() && ostim.IsFemale(ostim.GetDomActor())
+				console("Dom actor hymen broke!")
+				domVirgin = false
+				BreakHymen(ostim.GetDomActor())
+			endif 
+
 			if subVirgin
 				console("Sub actor virginity lost!")
 				subVirgin = false
 				setVirginity(ostim.GetSubActor(), false, true)
 				SendModEvent("ovirginity_lost_sub")
 			EndIf
-		EndIf
+		endif 
+	endif
 
-		Utility.Wait(1)
-	endwhile
-
-	console("OV script closing out")
 EndEvent
-
 
 bool function calculateVirginity(actor npc)
 	int chance = getvirginitychance()
@@ -165,27 +216,17 @@ bool function calculateVirginity(actor npc)
 	return virgin
 EndFunction
 
-function StoreNPCDataInt(actor npc, string keys, int num)
-	StorageUtil.SetIntValue(npc as form, keys, num)
-	;console("Set value " + num + " for key " + keys)
-EndFunction
 
-int function GetNPCDataInt(actor npc, string keys)
-	return StorageUtil.GetIntValue(npc, keys, -1)
-EndFunction
 
 Function OnLoad()
 	RegisterForModEvent("ostim_start", "OstimStart")
 EndFunction
 
 bool function isProstitute(actor npc)
-	return npc.IsInFaction(jobInnServer) || npc.IsInFaction(FavorJobsBeggarFaction) || npc.IsInFaction(MarkarthTempleofDibellaFaction)
+	return npc.IsInFaction(jobInnServer) || npc.IsInFaction(FavorJobsBeggarFaction) || npc.IsInFaction(MarkarthTempleofDibellaFaction) || npc.IsInFaction(ovProstitute)
 EndFunction
 
 bool function isMarried(actor npc)
 	return npc.HasAssociation(Spouse)
 endfunction	
 
-function console(string in)
-	OsexIntegrationMain.Console(in)
-EndFunction
