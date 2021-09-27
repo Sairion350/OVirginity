@@ -19,9 +19,28 @@ race property OldPeopleRace auto
 
 OsexIntegrationMain ostim 
 
-globalvariable virginityChance
 
 ocumscript ocum
+
+bool Property ShowHymen
+	bool Function Get()
+		return StorageUtil.GetIntValue(none, "ovirginity.showhymen") as bool
+	EndFunction
+
+	Function Set(bool val)
+		StorageUtil.SetIntValue(none, "ovirginity.showhymen", val as int)
+	EndFunction
+EndProperty
+
+int Property virginityChance
+	int Function Get()
+		return StorageUtil.GetIntValue(none, "ovirginity.virginityChance") 
+	EndFunction
+
+	Function Set(int val)
+		StorageUtil.SetIntValue(none, "ovirginity.virginityChance", val)
+	EndFunction
+EndProperty
 
 Event OnInit()
 
@@ -38,7 +57,8 @@ Event OnInit()
 	MarkarthTempleofDibellaFaction = game.GetFormFromFile(0x0656EA, "Skyrim.esm") as faction
 	ovProstitute = GetFormFromFile(0x0805, "ovirginity.esp") as faction
 
-	virginitychance = game.GetFormFromFile(0x00806, "OVirginity.esp") as GlobalVariable 
+	virginitychance = 30
+	ShowHymen = true
 
 	ocum = game.GetFormFromFile(0x000800, "OCum.esp") as ocumscript
 
@@ -46,7 +66,7 @@ Event OnInit()
 		setVirginity(game.getplayer(), true)
 	endif 
 
-	console("Virginity chance: "  + getvirginitychance())
+	console("Virginity chance: "  + virginitychance)
 	OnLoad()
 
 	outils.RegisterForOUpdate(self)
@@ -54,9 +74,7 @@ Event OnInit()
 	console("OVirginity installed")
 EndEvent
 
-int function GetVirginityChance()
-	return virginitychance.GetValue() as int
-EndFunction
+
 
 
 bool function isVirgin(actor npc)
@@ -97,6 +115,10 @@ endfunction
 Function BreakHymen(actor npc)
 	if !GetNPCDataBool(npc, HymenKey)
 		Console("Hymen already broken")
+		return 
+	endif 
+	if !ShowHymen
+		console("fx disabled")
 		return 
 	endif 
 	ApplyBlood(npc)
@@ -195,7 +217,7 @@ Event OStimSceneChanged(String EventName, String StrArg, Float NumArg, Form Send
 EndEvent
 
 bool function calculateVirginity(actor npc)
-	int chance = getvirginitychance()
+	int chance = virginityChance
 
 	if isProstitute(npc)
 		chance = 2
