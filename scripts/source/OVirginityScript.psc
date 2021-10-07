@@ -1,4 +1,4 @@
-ScriptName OVirginityScript Extends Quest
+ScriptName OVirginityScript Extends OStimAddon
 import outils 
 
 ;needs StorageUtils from papyrusutils
@@ -17,7 +17,6 @@ faction ovProstitute
 AssociationType property Spouse Auto
 race property OldPeopleRace auto
 
-OsexIntegrationMain ostim 
 
 
 ocumscript ocum
@@ -47,7 +46,6 @@ Event OnInit()
 	IsVirginKey = "IsVirgin"
 	HymenKey = "HasHymen"
 
-	ostim = outils.getostim()
 
 	menstruationspell = GetFormFromFile(0x000804, "OVirginity.esp") as spell
 	hymenbreak = GetFormFromFile(0x000D68, "OVirginity.esp") as sound
@@ -69,9 +67,8 @@ Event OnInit()
 	console("Virginity chance: "  + virginitychance)
 	OnLoad()
 
-	outils.RegisterForOUpdate(self)
-	debug.Notification("OVirginity installed")
-	console("OVirginity installed")
+	LoadGameEvents = false 
+	InstallAddon("OVirginity")
 EndEvent
 
 
